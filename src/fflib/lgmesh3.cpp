@@ -2024,6 +2024,8 @@ public:
 	v = new E_Array(basicAC_F0_wa(to<K>(args[2]))); 
       else 
 	v = dynamic_cast<const E_Array *>( args[2].LeftValue() );
+  //cout << "Error: type of arg :" << *args[2].left()  << " in " << typeid(K).name() << " case " << endl;
+  //exit(0);
       if (!v) {
 	cout << "Error: type of arg :" << *args[2].left()  << " in " << typeid(K).name() << " case " << endl;
 	ErrorCompile(" We wait  a double/complex expression or a array expression",1);
@@ -2048,7 +2050,7 @@ public:
   { return  new CODE(args);}
   OneOperatorMakePtrFE3(aType tt):  // tt= aType<double>() or aType<E_Array>()  
     OneOperator(map_type[typeid(R).name()],map_type[typeid(R).name()],map_type[typeid(B).name()],tt)
-  {}
+  { cout << "==== OneOperatorMakePtrFE3 ====" <<endl;}
 };
 
 
@@ -2946,7 +2948,7 @@ void init_lgmesh3() {
 
     //GlgElement<Mesh3>
     
-    
+ // Morice: La version 2D de la suite sont dans [[lgmesh.cpp]] chercher MakePtrFE2
  // 3D volume
  TheOperators->Add("<-",
        new OneOperator2_<pf3rbase*,pf3rbase*,pfes3* >(MakePtrFE3_2),
