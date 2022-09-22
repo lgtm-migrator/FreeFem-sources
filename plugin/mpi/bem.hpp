@@ -1793,7 +1793,7 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
 
     if (VFBEM==1) {
         // info kernel
-        cout << "call getBemKernel(stack,largs);" << endl;
+        //cout << "call getBemKernel(stack,largs);" << endl;
         pair<BemKernel*,double> kernel = getBemKernel(stack,largs);
         BemKernel *Ker = kernel.first;
         double alpha = kernel.second;
@@ -1801,8 +1801,8 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
         if(mpirank == 0 && verbosity >5) {
             int nk=-1;
             iscombinedKernel(Ker) ? nk=2 : nk=1;
-            for(int i=0;i<nk;i++)
-                cout << " kernel info... i: " << i << " typeKernel: " << Ker->typeKernel[i] << " wave number: " << Ker->wavenum[i]  << " coeffcombi: " << Ker->coeffcombi[i] <<endl;
+            //for(int i=0;i<nk;i++)
+            //    cout << " kernel info... i: " << i << " typeKernel: " << Ker->typeKernel[i] << " wave number: " << Ker->wavenum[i]  << " coeffcombi: " << Ker->coeffcombi[i] <<endl;
         }
         htool::VirtualGenerator<R>* generator;
 
