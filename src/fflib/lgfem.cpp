@@ -1415,7 +1415,6 @@ struct OpMake_pvectgenericfes : public OneOperator {
     AnyType operator( )(Stack s) const {
         
       AnyType r = (*eppfes)(s);
-      
       pvectgenericfes *ppfes = GetAny< pvectgenericfes * >(r);
 
       /*
@@ -1434,9 +1433,8 @@ struct OpMake_pvectgenericfes : public OneOperator {
     
     const E_FEarray *a2(dynamic_cast< const E_FEarray * >(args[1].LeftValue( )));
     ffassert(a2);
-    int N = a2->size( );
-    
-    //cout << "N=" << N << endl;
+    // int N = a2->size( );
+    // cout << "N=" << N << endl;
     return new Op(args[0], *a2 );
   }
   OpMake_pvectgenericfes( )
@@ -7013,7 +7011,6 @@ void clean_lgfem( ) {
 }
 template< class K, class v_fes >
 Expression IsFEcomp(const C_F0 &c, int i, Expression &rrr, Expression &iii) {
-  //cout << "test IsFEComp" << endl; // Morice
   Expression r = 0;
   if (!i) rrr = 0, iii = 0;
   if (atype< typename E_FEcomp< K, v_fes >::Result >( ) == c.left( )) {
@@ -7347,6 +7344,7 @@ C_F0 NewFEvariable(ListOfId *pids, Block *currentblock, C_F0 &fespacetype, CC_F0
   //else if (dim == 7)
   //  return NewFEvariableT< generic_v_fes, 7 >(pids, currentblock, fespacetype, init, cplx, dim); // Morice Fonction non tester
   else
+    cerr << "value dim=" << dim << endl;
     CompileError("Invalid fespace on Rd  ( d != 2 or 3) ");
   return C_F0( );
 }
@@ -7360,7 +7358,7 @@ C_F0 NewFEvariable(const char *id, Block *currentblock, C_F0 &fespacetype, CC_F0
   lid->push_back(UnId(id));
   return NewFEvariable(lid, currentblock, fespacetype, init, cplx, dim);
 }
-      
+/*  
 size_t dimFESpaceImage(const basicAC_F0 &args) {
   // return the dimension of the component of the FESpace
   aType t_tfe = atype< TypeOfFE * >( );
@@ -7373,17 +7371,7 @@ size_t dimFESpaceImage(const basicAC_F0 &args) {
 
   aType atfs[] = {atype< pfes * >( ), atype< pfes3 * >( ), atype< pfesS * >( ),
                   atype< pfesL * >( )};
-  /*
-  int numberOfpfes = 0; // number of type of pfes, pfes3, pfesS, pfesL 
-  cout << " reference of variable " << &args << endl;
-  for (int i = 0; i < args.size( ); i++) {
-    for(int iii=0; iii < 4; iii++){
-      if( atfs[iii] == args[i].left( ) ){
-        numberOfpfes++;
-      }
-    }
-  }
-  */
+  
 
   // J. Morice : actuellement, on fait cette hypothèse car je ne veux pas gérér pour l'instant les paramétres 
   //             en même temps les fespace et les autres (Th,P1,[P1,P1],nb_periodic)
@@ -7429,6 +7417,110 @@ size_t dimFESpaceImage(const basicAC_F0 &args) {
   if(verbosity >99) cout << "nbitem in the FEspace =" << dim23 << endl;
   return dim23;
 }
+*/
+
+KN<size_t> dimFESpaceImage(const basicAC_F0 &args) {
+  // return the dimension of all the component of the FESpace and the result is of size 1.
+  //
+  // For a compositeFESpace Wh=<Uh1,....Uhn> , return the different dimension of each FESpace Uhi and the result is of size n;
+  // 
+  aType t_tfe = atype< TypeOfFE * >( );
+  aType t_tfe3 = atype< TypeOfFE3 * >( );
+  aType t_tfeS = atype< TypeOfFES * >( );
+  aType t_tfeL = atype< TypeOfFEL * >( );
+  aType t_a = atype< E_Array >( );
+  aType t_fea = atype< E_FEarray >( );
+
+  aType atfs[] = {atype< pfes * >( ), atype< pfes3 * >( ), atype< pfesS * >( ),
+                  atype< pfesL * >( )};
+  
+  // J. Morice : actuellement, on fait cette hypothèse car je ne veux pas gérér pour l'instant les paramétres 
+  //             en même temps les fespace et les autres (Th,P1,[P1,P1],nb_periodic)
+  //             
+  ///            Dans cette fonction, on peut le faire sans problème (cf la boucle qui suit). 
+  //             Mais garder par coherence vis à vis de la fonction << aType typeFESpace(const basicAC_F0 &args) >>.
+  // 
+  // ffassert( numberOfpfes == args.size( ) ||  numberOfpfes == 0); 
+
+  // determination of the size of vector 
+  bool compositeFESpace=false;
+  vector< size_t> dimComposite;
+  size_t dim23=0;
+
+  // create the good size for a compositeFESpace
+  for (int i = 0; i < args.size( ); i++){
+    // case E_FEarray of FEspace
+    if(args[i].left( ) == t_fea){
+      compositeFESpace= true;
+      const E_FEarray &efea = *dynamic_cast< const E_FEarray * >(args[i].LeftValue( ));
+      ffassert(&efea);
+      dimComposite.resize(efea.size());
+    }
+  }
+
+
+  for (int i = 0; i < args.size( ); i++){
+    // case TypeOfFE
+    if (args[i].left( ) == t_tfe || args[i].left( ) == t_tfe3 || args[i].left( ) == t_tfeS ||
+        args[i].left( ) == t_tfeL){
+      dim23+= args[i].LeftValue( )->nbitem( ) ; 
+      cout << " args[i].LeftValue( )->nbitem( ) ="<< args[i].LeftValue( )->nbitem( ) << " "<< dim23 << endl;
+    }
+    // case E_array of TypeOfFE
+    else if (args[i].left( ) == t_a) {
+      const E_Array &ea = *dynamic_cast< const E_Array * >(args[i].LeftValue( ));
+      ffassert(&ea);
+      for (int ii = 0; ii < ea.size( ); ii++)
+        if (ea[ii].left( ) == t_tfe || ea[ii].left( ) == t_tfe3 || ea[ii].left( ) == t_tfeS ||
+            ea[ii].left( ) == t_tfeL){
+          dim23+=ea[ii].nbitem( );
+          cout << " ea[ii]->nbitem( ) =" << ea[ii].nbitem( ) <<  " " << dim23 << endl; ;
+        }
+        else
+          ffassert(0);    // bug
+    }
+    // case E_FEarray of FEspace
+    else if(args[i].left( ) == t_fea){
+      const E_FEarray &efea = *dynamic_cast< const E_FEarray * >(args[i].LeftValue( ));
+      ffassert(&efea);
+      for (int ii = 0; ii < efea.size( ); ii++){
+        if( atfs[0] == efea[ii].left( )  || atfs[1] == efea[ii].left( ) || atfs[2] == efea[ii].left( ) || atfs[3] == efea[ii].left( ) ){
+          dimComposite[ii] = efea[ii].nbitem();
+          dim23 += efea[ii].nbitem();
+        }
+        else
+          ffassert(0);    // bug
+      }
+    }
+  }
+  if(compositeFESpace){
+    KN<size_t> result(dimComposite.size()); 
+    result[0] = dim23;
+    for (int ii = 0; ii < dimComposite.size( ); ii++){
+      if(dimComposite[ii] == 0){
+        cerr << "Error you have a FESpace with 0 componenent" << endl;
+        cerr << "nbitem in the "<< ii << "-th FEspace =" << dimComposite[ii] << endl;
+        ffassert(0);
+      }
+
+      //if(verbosity >99) 
+      cout << "nbitem in the "<< ii << "-th FEspace =" << dimComposite[ii] << endl;
+      result[ii] = dimComposite[ii];
+    }
+    return result;
+  }
+  else{
+    dim23 = dim23 ? dim23 : 1;
+    //if(verbosity >99) 
+    cout << "nbitem in the FEspace =" << dim23 << endl;
+
+    KN<size_t> result(1); result[0] = dim23;
+    return result;
+  }
+}
+
+
+
 
 aType typeFESpace(const basicAC_F0 &args) {
   aType t_m2 = atype< pmesh * >( );
@@ -7478,12 +7570,19 @@ aType typeFESpace(const basicAC_F0 &args) {
     cout << "args.size()=" << args.size() << endl;
   }
   
-  // J. Morice : actuellement, on fait cette hypothèse car je ne veux pas gérér pour l'instant les paramétres 
-  //             en même temps les fespace et les autres (Th,P1,[P1,P1],nb_periodic)
+  // J. Morice : actuellement, on fait cette hypothèse car je ne veux pas gérér pour l'instant les paramétres Uh
+  //             en même temps avec les fespace et les autres (Th,P1,[P1,P1],nb_periodic)
+  if( !(  ( numberOfpfes == size_efea  && size_efea > 0 && args.size() == 1 ) ||  numberOfpfes == 0 ) ){
+    cerr << "you try to define a compositeFESpace with " << endl;
+    cerr << " fespace  Wh(<U1h,...,Unh>, Th,[P1],...) or Wh(Th,[P1],..., <U1h,...,Unh>) is not allowed." << endl;
+    cerr << " fespace  Wh(<U1h,...,Unh>, <X1h,...,Xnh>) is not allowed." << endl;
+    cerr << " Only possiblity is : " << endl;
+    cerr << " fespace  Wh(<U1h,...,Uhn>) where Uhi is a FESpace." << endl;
+  }
   ffassert( ( numberOfpfes == size_efea  && size_efea > 0 && args.size() == 1 ) ||  numberOfpfes == 0); 
 
   if( numberOfpfes == 0){
-    // case without fespace as parameter
+    // case without fespace in the arguments
     for (int i = 0; i < args.size( ); i++) {
       tl = args[i].left( );
       if (tl == t_m2) {
