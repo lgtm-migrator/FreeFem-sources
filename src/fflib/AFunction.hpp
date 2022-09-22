@@ -385,6 +385,7 @@ class E_F0 :public CodeAlloc
    // virtual E_F0 * destroy(Stack ) const {return 0;}
   //  virtual const E_F0 * Parameter(Stack ) const {return this;}
     virtual size_t nbitem() const {return 1;}
+    virtual KN<size_t> componentNbitem() const { ffassert(0); KN<size_t> *AA = new KN<size_t>(1,(size_t) 0);  return *AA; };
     virtual bool EvaluableWithOutStack() const {return false;} // 
     virtual bool MeshIndependent() const {return true;} // 
     virtual bool Zero() const {return false;} //
@@ -1323,11 +1324,15 @@ template<class R> class EConstant:public E_F0
 };
 
 
-class LocalVariableFES : public LocalVariable { public:
-  size_t data;
-  LocalVariableFES(size_t o,aType tt,const  size_t & d) 
+class LocalVariableFES : public LocalVariable { 
+  private:
+  KN<size_t> data;
+  public:
+  LocalVariableFES(size_t o,aType tt,const  KN<size_t> & d) 
    : LocalVariable(o,tt),data(d) {}
-  size_t nbitem() const { /*cout << "LocalVariableFES :: nbitem = " << data <<  endl;*/ return data;}
+  size_t nbitem() const { /*cout << "LocalVariableFES :: nbitem = " << data <<  endl;*/ 
+  return data.sum();}
+  KN<size_t> componentNbitem() const{  cout << "data=" << data << endl; return data;}  // return the nbitem of each component of a composite FESpace.
 };
 
 template <class U>

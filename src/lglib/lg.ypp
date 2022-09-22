@@ -474,19 +474,6 @@ parameters_list:
 	/* | parameters_list ',' id '=' no_set_expr { $$= ($1+= make_pair<const char *,const C_F0>((const char *) $3,(C_F0) $5));} */
     ;
 
-/* used by [[fespace_def]] to define FE vectorial  J.Morice*/ 
-/* parameters_list_vect: */
-/* no_set_expr */ /*[[no_set_expr:]]*/      /*{ $$=$1;}*/ 
-    /*
-	| FESPACE  ID    { $$=Find($1);}
-	| FESPACE1  ID                           { $$=Find($1);}
-	| FESPACE3  ID                           { $$=Find($1);}
-  | FESPACES  ID                           { $$=Find($1);}
-  | FESPACEL  ID                           { $$=Find($1);}
-  | ID '=' no_set_expr                     { $$=make_pair<const char *,const C_F0>((const char *) $1,(C_F0) $3);}
-  */
-/*  | parameters_list_vect ',' no_set_expr        { $$ = ($1 += $3);}*/
-/*;*/
 
 type_of_dcl:   TYPE
     | TYPE '[' TYPE ']'                       {$$=TypeArray($1,$3);}
@@ -541,11 +528,6 @@ spaceIDs :    fespace               spaceIDb    { $$=0;  $$ = $2;}
 fespace_def:
    ID '(' parameters_list ')'  {$$=currentblock->NewVar<LocalVariableFES,size_t>($1,typeFESpace($3),$3,dimFESpaceImage($3));
      $3.destroy(); }
- /*  | ID '(' '[' parameters_list_vect  ']' ',' '[' parameters_list_vect ']' ')'  {$$=currentblock->NewVar<LocalVariableFES,size_t>($1,typeFESpace($4),$4,dimFESpaceImage($4)); $4.destroy(); } */
- /*  | ID '(' '[' parameters_list_vect  ']' ')'  { $$=currentblock->NewVar<LocalVariableFES,size_t>($1,typeFESpace($4),$4,dimFESpaceImage($4)); $4.destroy(); } */
- /*  | ID '(' '[' parameters_list_vect ']' ',' '[' parameters_list_vect  ']' ')'  { $$=dimFESpaceVectImage( $4+=$8 ); $4.destroy(); $8.destroy(); } */
- /*  | ID '{'  parameters_list_vect '}'  { $$=dimVectFESpace($3); $3.destroy();  } */
- /*  | ID '{'  parameters_list_vect '}'  { $$=currentblock->NewVar<LocalVariableVectFES,size_t>($1, typeVecFESpace($3), $3 ); $3.destroy();  } */
     ;
 
 fespace_def_list:  fespace_def
