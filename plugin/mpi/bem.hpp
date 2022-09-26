@@ -1233,13 +1233,13 @@ void ff_BIO_Generator(htool::VirtualGenerator<K>*& generator, BemKernel *typeKer
 */
 
 template <class K, class mesh>
-void ff_BIO_Generator_Maxwell(htool::VirtualGenerator<K>*& generator, BemKernel *typeKernel, mesh& m, double alpha) {
+void ff_BIO_Generator_Maxwell(htool::VirtualGenerator<K>*& generator, BemKernel *typeKernel, bemtool::Dof<bemtool::RT0_2D>& dof, double alpha) {
     cout << " mettre un msg d erreur pour dire que cette combi n existe pas" << endl;
     return;
 }
 
 template <class K>
-void ff_BIO_Generator_Maxwell(htool::VirtualGenerator<K>*& generator, BemKernel *typeKernel, bemtool::Mesh2D& m, double alpha) {
+void ff_BIO_Generator_Maxwell(htool::VirtualGenerator<K>*& generator, BemKernel *typeKernel, bemtool::Dof<bemtool::RT0_2D>& dof, double alpha) {
 
     if(mpirank == 0) cout << "ff_BIO::Maxwell:: " << endl;
 
@@ -1251,7 +1251,6 @@ void ff_BIO_Generator_Maxwell(htool::VirtualGenerator<K>*& generator, BemKernel 
     if(iscombined) ffassert( (kappaRe1==kappaRe2) && (kappaIm1==kappaIm2) );
     std::complex<double> coeff1=typeKernel->coeffcombi[0], coeff2=typeKernel->coeffcombi[1];
 
-    bemtool::Dof<bemtool::RT0_2D> dof(m);
 
     // BIO_Generator -> single kernel
     // Equ Helmholtz kappa1.real() > 0 et kappa1.imag() == 0
@@ -1314,19 +1313,18 @@ void ff_POT_Generator(htool::VirtualGenerator<R>*& generator,BemPotential *typeP
 }
 
 template <class R, typename P, typename MeshBemtool >
-void ff_POT_Generator_Maxwell(htool::VirtualGenerator<R>*& generator,BemPotential *typePot, MeshBemtool &mesh, bemtool::Geometry &node_output ){
+void ff_POT_Generator_Maxwell(htool::VirtualGenerator<R>*& generator,BemPotential *typePot, bemtool::Dof<P> &dof, MeshBemtool &mesh, bemtool::Geometry &node_output ){
     cout << " mettre un msg d erreur pour dire que cette combi n existe pas" << endl;
     return;
 }
 
 template <class R, typename P>
-void ff_POT_Generator_Maxwell(htool::VirtualGenerator<R>*& generator,BemPotential *typePot, bemtool::Mesh2D &mesh, bemtool::Geometry &node_output ) {
+void ff_POT_Generator_Maxwell(htool::VirtualGenerator<R>*& generator,BemPotential *typePot, bemtool::Dof<P> &dof, bemtool::Mesh2D &mesh, bemtool::Geometry &node_output ) {
     
     bemtool::PotKernelEnum pot = whatTypeEnum(typePot);
     double kappaRe = typePot->wavenum.real(),kappaIm = typePot->wavenum.imag();
     if(mpirank == 0 && verbosity > 5) cout << "typePot->wavenum=" << typePot->wavenum << endl;
     
-    bemtool::Dof<P> dof(mesh);
     switch (pot) {
         case bemtool::SL_POT :
             if (kappaRe && !kappaIm) {
@@ -1665,10 +1663,10 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
     TRdHat pbt;
     pbs[0] = 1./(SRdHat::d+1);
     pbs[1] = 1./(SRdHat::d+1);
-    if (SRdHat::d == 2) pbs[2] = 1./(SRdHat::d+1);
+    if (SRdHat::d == 3) pbs[2] = 1./(SRdHat::d+1);
     pbt[0] = 1./(TRdHat::d+1);
     pbt[1] = 1./(TRdHat::d+1);
-    if (TRdHat::d == 2) pbt[2] = 1./(TRdHat::d+1);
+    if (TRdHat::d == 3) pbt[2] = 1./(TRdHat::d+1);
 
     int Snbv = Uh->TFE[0]->ndfonVertex;
     int Snbe = Uh->TFE[0]->ndfonEdge;
@@ -1824,7 +1822,8 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
             ff_BIO_Generator<R,P2,SMesh>(generator,Ker,dof,alpha);
         }
         else if (SRT0 && SRdHat::d == 2) {
-            ff_BIO_Generator_Maxwell<R>(generator,Ker,mesh,alpha);
+            bemtool::Dof<bemtool::RT0_2D> dof(mesh);
+            ff_BIO_Generator_Maxwell<R>(generator,Ker,dof,alpha);
         }
         else
             ffassert(0);
@@ -1882,8 +1881,8 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
             ff_POT_Generator<R,P2,MeshBemtool,SMesh>(generator,Pot,dof,mesh,node_output);
         }
         else if (SRT0 && SRdHat::d == 2) {
-            
-            ff_POT_Generator_Maxwell<R,bemtool::RT0_2D>(generator,Pot,mesh,node_output);
+            bemtool::Dof<bemtool::RT0_2D> dof(mesh);
+            ff_POT_Generator_Maxwell<R,bemtool::RT0_2D>(generator,Pot,dof,mesh,node_output);
         }
         else
             ffassert(0);

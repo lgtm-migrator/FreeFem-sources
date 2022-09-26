@@ -3593,6 +3593,7 @@ bool SparseDefault()
 bool Have_UMFPACK_=false;
 bool Have_UMFPACK() { return Have_UMFPACK_;}
 
+template<class R>
 MatriceMorse<R> * removeHalf(MatriceMorse<R> & A,long half,double tol)
 {
 
@@ -3602,7 +3603,7 @@ MatriceMorse<R> * removeHalf(MatriceMorse<R> & A,long half,double tol)
     int nnz =0;
 
     if( A.half )
-        return &A;//  copy
+        return new MatriceMorse<R>(A);//  copy
     // do alloc
     MatriceMorse<R> *r=new MatriceMorse<R>(A);
     r->RemoveHalf(half,tol);
@@ -3612,6 +3613,7 @@ MatriceMorse<R> * removeHalf(MatriceMorse<R> & A,long half,double tol)
     return r;
 }
 
+template<class R>
 newpMatrice_Creuse<R> removeHalf(Stack stack,Matrice_Creuse<R> *const & pA,long const & half,const double & tol)
 {
     MatriceCreuse<R> * pa=pA->A;
@@ -3619,7 +3621,7 @@ newpMatrice_Creuse<R> removeHalf(Stack stack,Matrice_Creuse<R> *const & pA,long 
     ffassert(pma);
     return newpMatrice_Creuse<R>(stack,removeHalf(*pma,half,tol));
 }
-
+template<class R>
 bool removeHalf(Stack stack,Matrice_Creuse<R> *const & pR,Matrice_Creuse<R> *const & pA,long const & half,const double & tol)
 {
     MatriceCreuse<R> * pa=pA->A;
@@ -3629,6 +3631,7 @@ bool removeHalf(Stack stack,Matrice_Creuse<R> *const & pR,Matrice_Creuse<R> *con
     pR->A.master(pr);
     return true;
 }
+template<class R>
 newpMatrice_Creuse<R> removeHalf(Stack stack,Matrice_Creuse<R> *const & pA,long const & half)
 {
     return removeHalf(stack,pA,half,-1.);
@@ -3903,6 +3906,10 @@ void  init_lgmat()
     Global.Add("removeHalf", "(", new OneOperator2s_<newpMatrice_Creuse<R> ,Matrice_Creuse<R> * ,long>(removeHalf));
     Global.Add("removeHalf", "(", new OneOperator3s_<newpMatrice_Creuse<R> ,Matrice_Creuse<R> * ,long,double>(removeHalf));
     Global.Add("removeHalf", "(", new OneOperator4s_<bool,Matrice_Creuse<R> * ,Matrice_Creuse<R> * ,long,double>(removeHalf));
+// Add FH sep 2022
+    Global.Add("removeHalf", "(", new OneOperator2s_<newpMatrice_Creuse<Complex> ,Matrice_Creuse<Complex> * ,long>(removeHalf));
+    Global.Add("removeHalf", "(", new OneOperator3s_<newpMatrice_Creuse<Complex> ,Matrice_Creuse<Complex> * ,long,double>(removeHalf));
+    Global.Add("removeHalf", "(", new OneOperator4s_<bool,Matrice_Creuse<Complex> * ,Matrice_Creuse<Complex> * ,long,double>(removeHalf));
 
 }
 

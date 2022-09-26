@@ -22,8 +22,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Added
--
+- add in examples/mpi/chamonix.edp : radiative transfer (use new plugin 
+     plugin/mpi/RadiativeTransfer_htool.cpp, illustrates the use of htool for compression
+     of user defined matrix operator)
+- transform a surface meshS in 2d mesh (warning with overloaping, no test) with movemesh:
+ 
+    meshS Ths = square3(10,10,[x,y,square(2*x-1)+square(2*y-1)]); 
+    real[int] gzz;
+    mesh Th2 = movemesh(Ths,transfo=[x,y,z],getZ=gzz);//  get flat 2d mesh form meshS 
 
+- New 1d finite element P3 hermite (C1) finite element in plugin `Element_P3` 
+	meshL Th=segment(1,[x*L,0,0]); fespace Vh(Th,P3HL);
+	see exemple end of exemple plugin/testFE-P3
+- missing new 1d finite element P4 in plugin `Elemnt_P4`
+- plugin `plugin/seq/MatrixMarket.cpp`  to read and save matrix in MatrixMarket and add also a binary form 
+     (see examples/plugin/MatrixMarket.edp test)
+- add ILU on complex matrix in plugin IncompleteCholesky 
+    remark:the IncompleteCholesky is writen but not tested
+- add test of functionnal interface of complex eigen value problem in 
+    `examples/eigen/LapEigenValueFuncComplex.edp`
 ### Changed
 -
 
@@ -71,9 +88,12 @@ All notable changes to this project will be documented in this file.
 - new finite element on MeshS  this  finite element is the ortogonal of RT0 on surface, or 
    Nelelec Finite Element on triangle with one DoF per mesh edge and where the DoF is the 
    current on  Edge in orientate edge by number of vertices.  
--  plugin Element_P3pnc for new 2d finite element P3pnc (P3 + 2 bulles)  noncoforming  (continuite of P2 mod)   
+-  plugin Element_P3pnc for new 2d finite element P3pnc (P3 + 2 bulles)  nonconforming  (continuite of P2 mod)   
    and add 2 examples with this new finite element 
       examples/plugin/cavityNewtowP3pnc.edp examples/plugin/testFE-P3pnc.edp
+-  plugin Element_P3nc for new 2d finite element P3pnc (P3 )  nonconforming  (continuite of P2 mod)   
+   and add  examples with this new finite element 
+      examples/plugin/testFE-P3pnc.edp
 - function to set dirichlet Boundary conditon on matrix A (real ou compex) trought  an real[int] 
     (if none zero => set BC ) 
   setBC(A,au1[],-2); and the example 
@@ -106,7 +126,7 @@ All notable changes to this project will be documented in this file.
   `nuVertex` of now the vertex number of element in intallBE0d integral
   `BoundaryBE`, `InternalBE` to know if border element (BE) is on true boundary of not.
   update `nElementonB` in case on no manifold data (value greater > 2) in meshL, MeshS case ..
-  add code to use jump, mean of test functuon on MeshL case. ( not in mesh3 ) to compute RHS.
+  add code to use jump, mean, otherside of test function on MeshL case. ( not in mesh3 ) to compute RHS.
 - add getcwd() function in shell plugin to get the current working dir
 - add nuVertex to get the vextex on element in some int?
 

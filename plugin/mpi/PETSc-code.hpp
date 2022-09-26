@@ -96,17 +96,64 @@ void varfBem(const typename fes1::FESpace*& PUh, const typename fes2::FESpace*& 
     ffassert(VFBEM == -1);
 }
 
-template<typename P, typename MeshBemtool, typename std::enable_if< std::is_same<P, bemtool::P0_1D>::value || std::is_same<P, bemtool::P0_2D>::value >::type* = nullptr >
+template<typename P, typename MeshBemtool, typename std::enable_if< std::is_same<P, bemtool::RT0_2D>::value || std::is_same<P, bemtool::P0_1D>::value || std::is_same<P, bemtool::P0_2D>::value >::type* = nullptr >
 bemtool::Dof<P>* new_dof(MeshBemtool *mesh) {
     return new bemtool::Dof<P>(*mesh);
 }
 
-template<typename P, typename MeshBemtool, typename std::enable_if< !std::is_same<P, bemtool::P0_1D>::value && !std::is_same<P, bemtool::P0_2D>::value >::type* = nullptr >
+template<typename P, typename MeshBemtool, typename std::enable_if< !std::is_same<P, bemtool::RT0_2D>::value && !std::is_same<P, bemtool::P0_1D>::value && !std::is_same<P, bemtool::P0_2D>::value >::type* = nullptr >
 bemtool::Dof<P>* new_dof(MeshBemtool *mesh) {
     return new bemtool::Dof<P>(*mesh, true);
 }
 
-template<typename P, typename MeshBemtool, typename Mesh1, typename Mesh2, typename FESpace2>
+template<typename P, typename MeshBemtool, typename Mesh1, bool T, typename Mesh2, typename FESpace2, typename std::enable_if< !T >::type* = nullptr >
+void dispatch(MeshBemtool *mesh, bemtool::Geometry *node, int VFBEM, Stack stack, const list<C_F0>& bargs, const Data_Sparse_Solver& ds, Dmat* B, const Mesh2& ThV, std::vector<double>& p1, std::vector<double>& p2, bool same, const FESpace2& Vh) {
+    HtoolCtx<P,MeshBemtool>* ctx = new HtoolCtx<P,MeshBemtool>;
+    ctx->dof = new_dof<P>(mesh);
+    ctx->mesh = mesh;
+    ctx->node = node;
+    bemtool::Geometry node_output;
+    if (VFBEM == 1) {
+        pair<BemKernel*, double> kernel = getBemKernel(stack, bargs);
+        BemKernel *Ker = kernel.first;
+        double alpha = kernel.second;
+        ff_BIO_Generator_Maxwell<PetscScalar>(ctx->generator,Ker,*ctx->dof,alpha);
+    }
+    else if (VFBEM == 2) {
+        BemPotential *Pot = getBemPotential(stack, bargs);
+        if (Vh.MaxNbNodePerElement == Mesh2::RdHat::d+1)
+            Mesh2Bemtool(ThV,node_output);
+        else if (Vh.MaxNbNodePerElement == 1) {
+            int m = Vh.NbOfDF;
+            typename Mesh2::RdHat pbt(1./(Mesh2::RdHat::d+1),1./(Mesh2::RdHat::d+1));
+            for (int i=0; i<m; i++) {
+                Fem2D::R3 p = ThV[i](pbt);
+                bemtool::R3 q;
+                q[0]=p.x; q[1]=p.y; q[2]=p.z;
+                node_output.setnodes(q);
+            }
+        }
+        else
+            ffassert(0);
+        ff_POT_Generator_Maxwell<PetscScalar,P>(ctx->generator,Pot,*ctx->dof,*mesh,node_output);
+    }
+    if (same) {
+        PetscContainer ptr;
+        PetscObjectQuery((PetscObject)B->_petsc, "HtoolCtx", (PetscObject*)&ptr);
+        PetscContainerDestroy(&ptr);
+        Assembly(B,ctx,ds.sparams,p1,p1,MPI_COMM_NULL,Mesh1::RdHat::d+1,ds.sym);
+        PetscContainerCreate(PetscObjectComm((PetscObject)B->_petsc), &ptr);
+        PetscContainerSetPointer(ptr, ctx);
+        PetscContainerSetUserDestroy(ptr, DestroyHtoolCtx<P,MeshBemtool>);
+        PetscObjectCompose((PetscObject)B->_petsc, "HtoolCtx", (PetscObject)ptr);
+    }
+    else {
+        Assembly(B,ctx,ds.sparams,p1,p2,MPI_COMM_NULL,Mesh1::RdHat::d+1,ds.sym);
+        delete ctx;
+    }
+}
+
+template<typename P, typename MeshBemtool, typename Mesh1, bool T, typename Mesh2, typename FESpace2, typename std::enable_if< T >::type* = nullptr >
 void dispatch(MeshBemtool *mesh, bemtool::Geometry *node, int VFBEM, Stack stack, const list<C_F0>& bargs, const Data_Sparse_Solver& ds, Dmat* B, const Mesh2& ThV, std::vector<double>& p1, std::vector<double>& p2, bool same, const FESpace2& Vh) {
     HtoolCtx<P,MeshBemtool>* ctx = new HtoolCtx<P,MeshBemtool>;
     ctx->dof = new_dof<P>(mesh);
@@ -190,6 +237,7 @@ void varfBem(const typename fes1::FESpace*& PUh, const typename fes2::FESpace*& 
     bool SP0 = Mesh1::RdHat::d == 1 ? (Snbv == 0) && (Snbe == 1) && (Snbt == 0) : (Snbv == 0) && (Snbe == 0) && (Snbt == 1);
     bool SP1 = (Snbv == 1) && (Snbe == 0) && (Snbt == 0);
     bool SP2 = (Snbv == 1) && (Snbe == 1) && (Snbt == 0);
+    bool SRT0 = (Mesh1::RdHat::d == 2) && (Snbv == 0) && (Snbe == 1) && (Snbt == 0);
     if (SP2) {
         bemtool::Dof<P2> dof(*mesh,true);
         for (int i=0; i<n; i++) {
@@ -200,7 +248,17 @@ void varfBem(const typename fes1::FESpace*& PUh, const typename fes2::FESpace*& 
             p1.emplace_back(p[2]);
         }
     }
-    else
+    else if (SRT0) {
+        bemtool::Dof<bemtool::RT0_2D> dof(*mesh);
+        for (int i=0; i<n; i++) {
+            const std::vector<bemtool::N2>& j = dof.ToElt(i);
+            bemtool::R3 p = dof(j[0][0])[j[0][1]];
+            p1.emplace_back(p[0]);
+            p1.emplace_back(p[1]);
+            p1.emplace_back(p[2]);
+        }
+    }
+    else {
         for (int i=0; i<n; i++) {
             Fem2D::R3 p;
             if (SP1)
@@ -215,30 +273,63 @@ void varfBem(const typename fes1::FESpace*& PUh, const typename fes2::FESpace*& 
             p1.emplace_back(p.y);
             p1.emplace_back(p.z);
         }
+    }
     if (!same) {
-        typename Mesh2::RdHat pbt(1./(Mesh2::RdHat::d+1),1./(Mesh2::RdHat::d+1));
-        p2.reserve(3*m);
-        for (int i=0; i<m; i++) {
-            Fem2D::R3 p;
-            if (Vh.MaxNbNodePerElement == Mesh2::RdHat::d+1)
-                p = ThV.vertices[i];
-            else if (Vh.MaxNbNodePerElement == 1)
-                p = ThV[i](pbt);
-            else {
-                if (mpirank == 0) std::cerr << "ff-BemTool error: only P0 and P1 FEspaces are available for reconstructions." << std::endl;
-                ffassert(0);
+        if(Vh.TFE[0]->N == 1) {
+            typename Mesh2::RdHat pbt(1./(Mesh2::RdHat::d+1),1./(Mesh2::RdHat::d+1));
+            p2.reserve(3*m);
+            for (int i=0; i<m; i++) {
+                Fem2D::R3 p;
+                if (Vh.MaxNbNodePerElement == Mesh2::RdHat::d+1)
+                    p = ThV.vertices[i];
+                else if (Vh.MaxNbNodePerElement == 1)
+                    p = ThV[i](pbt);
+                else {
+                    if (mpirank == 0) std::cerr << "ff-BemTool error: only P0 and P1 FEspaces are available for reconstructions." << std::endl;
+                    ffassert(0);
+                }
+                p2.emplace_back(p.x);
+                p2.emplace_back(p.y);
+                p2.emplace_back(p.z);
             }
-            p2.emplace_back(p.x);
-            p2.emplace_back(p.y);
-            p2.emplace_back(p.z);
+        }
+        else {
+            ffassert(SRT0 && Mesh1::RdHat::d == 2 && VFBEM == 2);
+            int nnn = Vh.TFE[0]->N;
+
+            typename Mesh2::RdHat pbt(1./(Mesh2::RdHat::d+1),1./(Mesh2::RdHat::d+1));
+            p2.reserve(3*m);
+
+            int mDofScalar = m/nnn; // computation of the dof of one component 
+
+            for (int i=0; i<mDofScalar; i++) {
+                Fem2D::R3 p;
+                if (Vh.MaxNbNodePerElement == Mesh2::RdHat::d + 1)
+                    p = ThV.vertices[i];
+                else if (Vh.MaxNbNodePerElement == 1)
+                    p = ThV[i](pbt);
+                else {
+                    if (mpirank == 0) std::cerr << "ff-BemTool error: only P0 and P1 FEspaces are available for reconstructions." << std::endl;
+                    ffassert(0);
+                }
+                for(int iii=0; iii<nnn; iii++){
+                    ffassert( nnn*3*i+3*iii+2 < nnn*3*m );
+                    p2.emplace_back(p.x);
+                    p2.emplace_back(p.y);
+                    p2.emplace_back(p.z);
+                }
+            }
         }
     }
     if (SP1)
-        dispatch<P1,MeshBemtool,Mesh1>(mesh, node, VFBEM, stack, bargs, ds, B, ThV, p1, p2, same, Vh);
+        dispatch<P1,MeshBemtool,Mesh1,true>(mesh, node, VFBEM, stack, bargs, ds, B, ThV, p1, p2, same, Vh);
     else if (SP0)
-        dispatch<P0,MeshBemtool,Mesh1>(mesh, node, VFBEM, stack, bargs, ds, B, ThV, p1, p2, same, Vh);
+        dispatch<P0,MeshBemtool,Mesh1,true>(mesh, node, VFBEM, stack, bargs, ds, B, ThV, p1, p2, same, Vh);
     else if (SP2)
-        dispatch<P2,MeshBemtool,Mesh1>(mesh, node, VFBEM, stack, bargs, ds, B, ThV, p1, p2, same, Vh);
+        dispatch<P2,MeshBemtool,Mesh1,true>(mesh, node, VFBEM, stack, bargs, ds, B, ThV, p1, p2, same, Vh);
+    else if (SRT0 && Mesh1::RdHat::d == 2) {
+        dispatch<bemtool::RT0_2D,MeshBemtool,Mesh1,false>(mesh, node, VFBEM, stack, bargs, ds, B, ThV, p1, p2, same, Vh);
+    }
     else
         ffassert(0);
 }
@@ -1703,6 +1794,7 @@ namespace PETSc {
       zeros.reserve(std::min(N, M));
       std::vector<std::pair<int, int>> destroy;
       destroy.reserve(N * M);
+      MPI_Comm comm1 = MPI_COMM_NULL, comm2 = MPI_COMM_NULL;
       for (int i = 0; i < N; ++i) {
         for (int j = 0; j < M; ++j) {
           Expression e = e_M[i][j];
@@ -1712,22 +1804,33 @@ namespace PETSc {
             if (t == 1) {
               DistributedCSR< HpddmType >* pt = GetAny< DistributedCSR< HpddmType >* >(e_ij);
               a[i * M + j] = pt->_petsc;
+              PetscObjectGetComm((PetscObject)pt->_petsc, &comm2);
+              if (comm1 != MPI_COMM_NULL) {
+                int flag;
+                MPI_Comm_compare(comm1, comm2, &flag);
+                ffassert(flag == MPI_CONGRUENT || flag == MPI_IDENT);
+              }
+              comm1 = comm2;
               exchange[i * M + j] = pt;
             } else if (t == 2) {
               DistributedCSR< HpddmType >* pt = GetAny< DistributedCSR< HpddmType >* >(e_ij);
               Mat B;
-              if (std::is_same< PetscScalar, PetscReal >::value)
-                MatCreateTranspose(pt->_petsc, &B);
-              else
-                MatCreateHermitianTranspose(pt->_petsc, &B);
+              MatCreateHermitianTranspose(pt->_petsc, &B);
               a[i * M + j] = B;
               destroy.emplace_back(i, j);
               exchange[i * M + j] = pt;
+              PetscObjectGetComm((PetscObject)pt->_petsc, &comm2);
+              if (comm1 != MPI_COMM_NULL) {
+                int flag;
+                MPI_Comm_compare(comm1, comm2, &flag);
+                ffassert(flag == MPI_CONGRUENT || flag == MPI_IDENT);
+              }
+              comm1 = comm2;
             } else if (t == 7) {
               PetscScalar r = GetAny< PetscScalar >(e_ij);
               if (std::abs(r) > 1.0e-16) {
                 Mat B;
-                MatCreateDense(PETSC_COMM_WORLD, PETSC_DECIDE, PETSC_DECIDE, 1, 1, NULL, &B);
+                MatCreateDense(comm1 != MPI_COMM_NULL ? comm1 : PETSC_COMM_WORLD, PETSC_DECIDE, PETSC_DECIDE, 1, 1, NULL, &B);
                 MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY);
                 MatAssemblyEnd(B, MAT_FINAL_ASSEMBLY);
                 PetscScalar* array;
@@ -1745,7 +1848,7 @@ namespace PETSc {
               Mat B;
               if (t == 3) x = GetAny< KN_< PetscScalar > >(e_ij);
               else x = GetAny< Transpose< KN_< PetscScalar > > >(e_ij);
-              MatCreateDense(PETSC_COMM_WORLD, x.n, PETSC_DECIDE, PETSC_DECIDE, 1, NULL, &B);
+              MatCreateDense(comm1 != MPI_COMM_NULL ? comm1 : PETSC_COMM_WORLD, x.n, PETSC_DECIDE, PETSC_DECIDE, 1, NULL, &B);
               MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY);
               MatAssemblyEnd(B, MAT_FINAL_ASSEMBLY);
               PetscScalar* array;
@@ -1759,8 +1862,7 @@ namespace PETSc {
               }
               else {
                 Mat C;
-                if (std::is_same< PetscScalar, PetscReal >::value) MatCreateTranspose(B, &C);
-                else MatCreateHermitianTranspose(B, &C);
+                MatCreateHermitianTranspose(B, &C);
                 MatDestroy(&B);
                 a[i * M + j] = C;
               }
@@ -1809,7 +1911,7 @@ namespace PETSc {
             y = x;
             Y = X;
           }
-          MatCreate(PETSC_COMM_WORLD, a + zeros[i] * M + zeros[i]);
+          MatCreate(comm1 != MPI_COMM_NULL ? comm1 : PETSC_COMM_WORLD, a + zeros[i] * M + zeros[i]);
           MatSetSizes(a[zeros[i] * M + zeros[i]], x, y, X, Y);
           MatSetType(a[zeros[i] * M + zeros[i]], MATAIJ);
           MatSeqAIJSetPreallocation(a[zeros[i] * M + zeros[i]], 0, NULL);
@@ -1821,7 +1923,7 @@ namespace PETSc {
       }
       Result sparse_mat = GetAny< Result >((*emat)(s));
       if (sparse_mat->_petsc) sparse_mat->dtor( );
-      MatCreateNest(PETSC_COMM_WORLD, N, NULL, M, NULL, a, &sparse_mat->_petsc);
+      MatCreateNest(comm1 != MPI_COMM_NULL ? comm1 : PETSC_COMM_WORLD, N, NULL, M, NULL, a, &sparse_mat->_petsc);
       for(std::pair<int, int> p : destroy)
           MatDestroy(a + p.first * M + p.second);
       sparse_mat->_exchange = reinterpret_cast<HPDDM::Subdomain<PetscScalar>**>(exchange);
@@ -3029,13 +3131,8 @@ namespace PETSc {
             b.emplace_back(std::make_pair(std::make_pair(i, j), Mat( )));
             Mat D = mat[i][j];
             Mat C;
-            if (std::is_same< PetscScalar, PetscReal >::value) {
-              MatTransposeGetMat(D, &b.back( ).second);
-              MatTranspose(b.back( ).second, MAT_INITIAL_MATRIX, &C);
-            } else {
-              MatHermitianTransposeGetMat(D, &b.back( ).second);
-              MatHermitianTranspose(b.back( ).second, MAT_INITIAL_MATRIX, &C);
-            }
+            MatHermitianTransposeGetMat(D, &b.back( ).second);
+            MatHermitianTranspose(b.back( ).second, MAT_INITIAL_MATRIX, &C);
             PetscObjectReference((PetscObject)b.back().second);
             MatNestSetSubMat(A, i, j, C);
             MatDestroy(&C);
@@ -3046,36 +3143,71 @@ namespace PETSc {
     MatConvert(A, MATAIJ, MAT_INITIAL_MATRIX, B);
     for (std::pair< std::pair< PetscInt, PetscInt >, Mat > p : b) {
       Mat C;
-      if (std::is_same< PetscScalar, PetscReal >::value)
-        MatCreateTranspose(p.second, &C);
-      else
-        MatCreateHermitianTranspose(p.second, &C);
+      MatCreateHermitianTranspose(p.second, &C);
       MatDestroy(&p.second);
       MatNestSetSubMat(A, p.first.first, p.first.second, C);
       MatDestroy(&C);
     }
   }
   template< class Type >
-  long MatConvert(Type* const& A, Type* const& B) {
-    if (A->_petsc) {
+  class convert_Op : public E_F0mps {
+   public:
+    Expression A;
+    Expression B;
+    static const int n_name_param = 1;
+    static basicAC_F0::name_and_type name_param[];
+    Expression nargs[n_name_param];
+    convert_Op(const basicAC_F0& args, Expression param1, Expression param2) : A(param1), B(param2) {
+      args.SetNameParam(n_name_param, name_param, nargs);
+    }
+
+    AnyType operator( )(Stack stack) const;
+  };
+  template< class Type >
+  basicAC_F0::name_and_type convert_Op< Type >::name_param[] = {
+    {"type", &typeid(std::string*)}
+  };
+  template< class Type >
+  class convert : public OneOperator {
+   public:
+    convert( ) : OneOperator(atype< long >( ), atype< Type* >( ), atype< Type* >( )) {}
+
+    E_F0* code(const basicAC_F0& args) const {
+      return new convert_Op< Type >(args, t[0]->CastTo(args[0]), t[1]->CastTo(args[1]));
+    }
+  };
+  template< class Type >
+  AnyType convert_Op< Type >::operator( )(Stack stack) const {
+    Type* ptA = GetAny< Type* >((*A)(stack));
+    Type* ptB = GetAny< Type* >((*B)(stack));
+    std::string stype = nargs[0] ? *GetAny< std::string* >((*nargs[0])(stack)) : "aij";
+    if (nargs[0]) std::transform(stype.begin(), stype.end(), stype.begin(), ::tolower);
+    if (ptA->_petsc) {
+      if (ptB->_petsc) ptB->dtor( );
       MatType type;
       PetscBool isType;
-      MatGetType(A->_petsc, &type);
+      MatGetType(ptA->_petsc, &type);
       PetscStrcmp(type, MATNEST, &isType);
       if (isType) {
-        if (B->_petsc) B->dtor( );
-        prepareConvert(A->_petsc, &B->_petsc);
+        prepareConvert(ptA->_petsc, &ptB->_petsc);
       }
       else {
+        Mat C = ptA->_petsc;
 #if defined(PETSC_HAVE_HTOOL)
         PetscStrcmp(type, MATHTOOL, &isType);
         if (isType) {
-          if (B->_petsc) B->dtor( );
-          MatConvert(A->_petsc, MATDENSE, MAT_INITIAL_MATRIX, &B->_petsc);
+          MatConvert(ptA->_petsc, MATDENSE, MAT_INITIAL_MATRIX, &ptB->_petsc);
+          if (nargs[0] && stype.compare("dense") != 0) {
+            C = ptB->_petsc;
+            isType = PETSC_FALSE;
+          }
         }
 #endif
         if (!isType) {
-          MatConvert(A->_petsc, MATAIJ, MAT_INITIAL_MATRIX, &B->_petsc);
+          MatType mtype(stype.c_str());
+          MatConvert(C, mtype, MAT_INITIAL_MATRIX, &ptB->_petsc);
+          if (C != ptA->_petsc)
+              MatDestroy(&C);
         }
       }
     }
@@ -3274,8 +3406,8 @@ namespace PETSc {
           KSPSetOperators(ptA->_ksp, ptA->_petsc, ptA->_petsc);
         }
         if (c != 4) {
-          Vec x, y;
-          MatCreateVecs(ptA->_petsc, &x, &y);
+          Vec x = NULL, y;
+          MatCreateVecs(ptA->_petsc, in == out ? NULL : &x, &y);
           PetscInt size;
           VecGetLocalSize(y, &size);
           ffassert(in->n == size);
@@ -3283,25 +3415,33 @@ namespace PETSc {
             out->resize(size);
             *out = PetscScalar( );
           }
-          VecPlaceArray(x, *in);
+          if (x)
+            VecPlaceArray(x, *in);
+          else {
+            x = y;
+            PetscObjectReference((PetscObject)y);
+          }
           VecPlaceArray(y, *out);
           PetscInt N, rbegin;
           PetscScalar* tmpIn, *tmpOut;
           if (c != 3)
             KSPSolve(ptA->_ksp, x, y);
           else {
+            ffassert(in != out);
             VecConjugate(x);
             KSPSolveTranspose(ptA->_ksp, x, y);
             VecConjugate(y);
           }
           VecResetArray(y);
-          VecResetArray(x);
           VecDestroy(&y);
-          VecDestroy(&x);
+          if (x != y) {
+            VecResetArray(x);
+            VecDestroy(&x);
+          }
         } else {
           Dmat* X = GetAny< Dmat* >((*x)(stack));
           Dmat* Y = GetAny< Dmat* >((*y)(stack));
-          ffassert(X && Y);
+          ffassert(X && Y && X != Y);
           PetscBool isDense;
           PetscObjectTypeCompareAny((PetscObject)X->_petsc, &isDense, MATMPIDENSE, MATSEQDENSE, "");
           Mat XD;
@@ -4494,8 +4634,7 @@ namespace PETSc {
                           PetscStrcmp(type, MATTRANSPOSEMAT, &isType);
                           if(isType) {
                               Mat C;
-                              if (std::is_same< PetscScalar, PetscReal >::value) MatTransposeGetMat(mat[i][j], &C);
-                              else MatHermitianTransposeGetMat(mat[i][j], &C);
+                              MatHermitianTransposeGetMat(mat[i][j], &C);
                               PetscObjectTypeCompareAny((PetscObject)C, &isType, MATMPIDENSE, MATSEQDENSE, "");
                               if(isType) MatGetSize(C, &m, &n);
                               type = MATTRANSPOSEMAT;
@@ -4865,7 +5004,7 @@ namespace PETSc {
     }
     Global.Add("MatPtAP", "(",
                new OneOperator3_< long, Dmat*, Dmat*, Dmat* >(PETSc::MatPtAP));
-    Global.Add("MatConvert", "(", new OneOperator2_< long, Dmat*, Dmat* >(PETSc::MatConvert));
+    Global.Add("MatConvert", "(", new PETSc::convert< Dmat >);
     Global.Add("MatZeroRows", "(",
                new OneOperator2_< long, Dmat*, KN< double >* >(PETSc::MatZeroRows));
     Global.Add("KSPSolve", "(", new PETSc::LinearSolver< Dmat >( ));

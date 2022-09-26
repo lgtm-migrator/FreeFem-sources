@@ -46,10 +46,10 @@ FreeFem___mpi_SOURCES = /ffapi.cpp \
 FreeFem___mpi_DEPENDENCIES = ../fflib/libff.a
 LDADD = ../fflib/libff.a @UMFPACKLIBS@ @ARPACKLIBS@ @BLACSLIBS@ @MPI_LIB@ @FF_LIBS@
 
-ff_bem_include = -I/Users/jamorice/Project/FreeFem-sources-debug/3rdparty/include/htool/include -I/Users/jamorice/Project/FreeFem-sources-debug/3rdparty/include/BemTool/ -I/Users/jamorice/Project/FreeFem-sources-debug/3rdparty/boost/include -I../../plugin/seq/include -I../../plugin/mpi
+ff_bem_include = -I$(srcdir)/../../3rdparty/include/htool/include -I$(srcdir)/../../3rdparty/include/BemTool/ -I$(srcdir)/../../3rdparty/boost/include -I../../plugin/mpi
 
 AM_CXXFLAGS = -DPARALLELE
-AM_CPPFLAGS = -DPARALLELE -I$(srcdir)/../fflib -I$(srcdir)/../Graphics -I$(srcdir)/../femlib @MPI_INCLUDE@ $(HDF5_CPPFLAGS) $(UMFPACK_CPPFLAGS) $(ff_bem_include)
+AM_CPPFLAGS = -DPARALLELE -I$(srcdir)/../fflib -I$(srcdir)/../Graphics -I$(srcdir)/../femlib -I$(srcdir)/../bamglib/ @MPI_INCLUDE@ $(HDF5_CPPFLAGS) $(UMFPACK_CPPFLAGS) $(ff_bem_include)
 ff-mpirun: ff-mpirun.in Makefile
 	../../config.status  --file=ff-mpirun:ff-mpirun.in
 	chmod a+x ff-mpirun
