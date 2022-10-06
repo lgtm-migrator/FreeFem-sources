@@ -1330,9 +1330,8 @@ class LocalVariableFES : public LocalVariable {
   public:
   LocalVariableFES(size_t o,aType tt,const  KN<size_t> & d) 
    : LocalVariable(o,tt),data(d) {}
-  size_t nbitem() const { /*cout << "LocalVariableFES :: nbitem = " << data <<  endl;*/ 
-  return data.sum();}
-  KN<size_t> componentNbitem() const{  cout << "data=" << data << endl; return data;}  // return the nbitem of each component of a composite FESpace.
+  size_t nbitem() const { /*cout << "LocalVariableFES :: nbitem = " << data <<  endl;*/ return data.sum();}
+  KN<size_t> componentNbitem() const{  /*cout << "data=" << data << endl;*/ return data;}  // return the nbitem of each component of a composite FESpace.
 };
 
 template <class U>

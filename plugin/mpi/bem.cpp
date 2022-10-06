@@ -854,10 +854,10 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
     TRdHat pbt;
     pbs[0] = 1./(SRdHat::d+1);
     pbs[1] = 1./(SRdHat::d+1);
-    if (SRdHat::d == 2) pbs[2] = 1./(SRdHat::d+1);
+    if (SRdHat::d == 3) pbs[2] = 1./(SRdHat::d+1);
     pbt[0] = 1./(TRdHat::d+1);
     pbt[1] = 1./(TRdHat::d+1);
-    if (TRdHat::d == 2) pbt[2] = 1./(TRdHat::d+1);
+    if (TRdHat::d == 3) pbt[2] = 1./(TRdHat::d+1);
 
     int Snbv = Uh->TFE[0]->ndfonVertex;
     int Snbe = Uh->TFE[0]->ndfonEdge;
@@ -866,13 +866,6 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
     bool SP1 = (Snbv == 1) && (Snbe == 0) && (Snbt == 0);
     bool SP2 = (Snbv == 1) && (Snbe == 1) && (Snbt == 0);
     bool SRT0 = (SRdHat::d == 2) && (Snbv == 0) && (Snbe == 1) && (Snbt == 0);
-
-    if(mpirank == 0){
-        cout << "Vh->TFE[0]->N=" << Vh->TFE[0]->N << endl;
-        //cout << "Vh->TFE[0].N=" << Vh->TFE[0].N << endl;
-        cout << "Vh->TFE.N()=" << Vh->TFE.N() << endl;
-        cout << "Vh->MaxNbNodePerElement=" << Vh->MaxNbNodePerElement << endl;
-    }
 
     if (SP2) {
         Dof<P2> dof(mesh,true);
@@ -1195,10 +1188,10 @@ AnyType OpHMatrixtoBEMForm<R,MMesh,v_fes1,v_fes2>::Op::operator()(Stack stack)  
     TRdHat pbt;
     pbs[0] = 1./(SRdHat::d+1);
     pbs[1] = 1./(SRdHat::d+1);
-    if (SRdHat::d == 3) pbs[2] = 1./(SRdHat::d+1);
+    if (SRdHat::d == 2) pbs[2] = 1./(SRdHat::d+1);
     pbt[0] = 1./(TRdHat::d+1);
     pbt[1] = 1./(TRdHat::d+1);
-    if (TRdHat::d == 3) pbt[2] = 1./(TRdHat::d+1);
+    if (TRdHat::d == 2) pbt[2] = 1./(TRdHat::d+1);
 
     int Snbv = Uh->TFE[0]->ndfonVertex;
     int Snbe = Uh->TFE[0]->ndfonEdge;
@@ -1207,6 +1200,13 @@ AnyType OpHMatrixtoBEMForm<R,MMesh,v_fes1,v_fes2>::Op::operator()(Stack stack)  
     bool SP1 = (Snbv == 1) && (Snbe == 0) && (Snbt == 0);
     bool SP2 = (Snbv == 1) && (Snbe == 1) && (Snbt == 0);
     bool SRT0 = (SRdHat::d == 2) && (Snbv == 0) && (Snbe == 1) && (Snbt == 0);
+
+    if(mpirank == 0){
+        cout << "Vh->TFE[0]->N=" << Vh->TFE[0]->N << endl;
+        //cout << "Vh->TFE[0].N=" << Vh->TFE[0].N << endl;
+        cout << "Vh->TFE.N()=" << Vh->TFE.N() << endl;
+        cout << "Vh->MaxNbNodePerElement=" << Vh->MaxNbNodePerElement << endl;
+    }
 
     if (SP2) {
         Dof<P2> dof(mesh,true);

@@ -1663,10 +1663,10 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
     TRdHat pbt;
     pbs[0] = 1./(SRdHat::d+1);
     pbs[1] = 1./(SRdHat::d+1);
-    if (SRdHat::d == 2) pbs[2] = 1./(SRdHat::d+1);
+    if (SRdHat::d == 3) pbs[2] = 1./(SRdHat::d+1);
     pbt[0] = 1./(TRdHat::d+1);
     pbt[1] = 1./(TRdHat::d+1);
-    if (TRdHat::d == 2) pbt[2] = 1./(TRdHat::d+1);
+    if (TRdHat::d == 3) pbt[2] = 1./(TRdHat::d+1);
 
     int Snbv = Uh->TFE[0]->ndfonVertex;
     int Snbe = Uh->TFE[0]->ndfonEdge;
@@ -1822,7 +1822,8 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
             ff_BIO_Generator<R,P2,SMesh>(generator,Ker,dof,alpha);
         }
         else if (SRT0 && SRdHat::d == 2) {
-            ff_BIO_Generator_Maxwell<R>(generator,Ker,mesh,alpha);
+            bemtool::Dof<bemtool::RT0_2D> dof(mesh);
+            ff_BIO_Generator_Maxwell<R>(generator,Ker,dof,alpha);
         }
         else
             ffassert(0);
@@ -1880,8 +1881,8 @@ void creationHMatrixtoBEMForm(const FESpace1 * Uh, const FESpace2 * Vh, const in
             ff_POT_Generator<R,P2,MeshBemtool,SMesh>(generator,Pot,dof,mesh,node_output);
         }
         else if (SRT0 && SRdHat::d == 2) {
-            
-            ff_POT_Generator_Maxwell<R,bemtool::RT0_2D>(generator,Pot,mesh,node_output);
+            bemtool::Dof<bemtool::RT0_2D> dof(mesh);
+            ff_POT_Generator_Maxwell<R,bemtool::RT0_2D>(generator,Pot,dof,mesh,node_output);
         }
         else
             ffassert(0);
