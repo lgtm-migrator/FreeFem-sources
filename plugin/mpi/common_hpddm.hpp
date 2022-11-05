@@ -7,7 +7,6 @@
 #include <AFunction_ext.hpp>
 #include <array_tlp.hpp>
 #include <unordered_map>
-#define GENERATE_DEPRECATED_FUNCTIONS
 
 #if defined(WITH_bemtool) && defined(PETSC_HAVE_HTOOL)
 #include <bemtool/tools.hpp>
