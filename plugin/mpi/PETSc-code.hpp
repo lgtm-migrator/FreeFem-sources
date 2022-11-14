@@ -4659,7 +4659,7 @@ namespace PETSc {
         PetscStrcmp(type, MATNEST, &isType);
         PetscScalar* p = reinterpret_cast<PetscScalar*>(u->operator upscaled_type<PetscScalar>*());
 
-        if(1){
+        if( (*t)._vector_global ){
           for(int i = 0; i < u->n; ++i)
               p[i] = u->operator[](i);
           MPI_Allreduce(MPI_IN_PLACE, p, u->n, HPDDM::Wrapper<K>::mpi_type(), MPI_SUM, PETSC_COMM_WORLD);
@@ -4776,7 +4776,7 @@ namespace PETSc {
         if (verbosity > 0 && mpirank == 0)
           cout << " --- system solved with PETSc (in " << MPI_Wtime( ) - timing << ")" << endl;
         p = reinterpret_cast<PetscScalar*>(out->operator upscaled_type<PetscScalar>*());
-        if(1){
+        if((*t)._vector_global){
           VecGetArray(y, &ptr);
           if(isType) {
             Mat** mat;
@@ -4895,7 +4895,7 @@ namespace PETSc {
           PetscScalar* p = reinterpret_cast<PetscScalar*>(u->operator upscaled_type<PetscScalar>*());
           PetscStrcmp(type, MATNEST, &isType);
           
-          if(1){
+          if((*t)._vector_global){
             int nb_comm_size;
             MPI_Comm_size(PETSC_COMM_WORLD,&nb_comm_size);
             for(int i = 0; i < u->n; ++i)
@@ -4975,7 +4975,7 @@ namespace PETSc {
           VecDestroy(&x);
           VecGetArray(y, &ptr);
 
-          if(1){
+          if((*t)._vector_global){
             p = reinterpret_cast<PetscScalar*>(out->operator upscaled_type<PetscScalar>*());
             if(isType) {
               Mat** mat;
@@ -5072,14 +5072,20 @@ namespace PETSc {
       return Ax;
     }
     static U init(U Ax, ProdPETSc< T, U, K, N > A) {
-      if (A.t->_A)
+      if( A.t->_vector_global ){
+        // case rhs and sol are global in freefem
         Ax->init(A.u->n);
-      else {
-        if (A.t->_exchange) {
-          if (N == 'T')
-            Ax->init(A.t->_exchange[1]->getDof());
-          else
-            Ax->init(A.t->_exchange[0]->getDof());
+      }
+      else{
+        if (A.t->_A)
+          Ax->init(A.u->n);
+        else {
+          if (A.t->_exchange) {
+            if (N == 'T')
+              Ax->init(A.t->_exchange[1]->getDof());
+            else
+              Ax->init(A.t->_exchange[0]->getDof());
+          }
         }
       }
       return mv(Ax, A);
@@ -5675,7 +5681,7 @@ Matrice_Creuse<R> *  PETSC_buildMatrixInterpolationForCompositeFESpace(const FES
   int NUh = Uh->N;
   int NVh = Vh->N;
 
-  cout << "NUh=" << NUh << ", NVh=" << NVh << endl;
+  if(verbosity>3) cout << "NUh=" << NUh << ", NVh=" << NVh << endl;
   Matrice_Creuse<R> * sparse_mat= new Matrice_Creuse<R>();
 
   // Remarque pas de U2Vc pour l'instant
@@ -5765,6 +5771,7 @@ struct OpMatrixtoBilinearFormVGPETSc
 
 };
 
+// function to transform freefem matrix in matIS.
 void ff_createMatIS( MatriceMorse<PetscScalar> &ff_mat, Mat &matIS){
     std::set<PetscInt> irows;
     std::set<PetscInt> jcols;
@@ -6198,11 +6205,15 @@ AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) co
     offsetMatrixUh += UhNbOfDf[i];
   } // end loop i
   
+  // 
+  cout << "Ares->_vector_global=" << Ares->_vector_global << endl; 
 
   if( NpUh==1 && maxJVh==1 ){
     Ares->_petsc = a[0];
+    Ares->_vector_global = (PetscBool) 1;
   }else{
     MatCreateNest(PETSC_COMM_WORLD, NpUh, NULL, maxJVh, NULL, a, &Ares->_petsc);
+    Ares->_vector_global = (PetscBool) 1;
   }
   return SetAny<PETSc::DistributedCSR< HpddmType >*>(Ares);
 }
