@@ -5865,6 +5865,9 @@ void ff_createMatIS( MatriceMorse<PetscScalar> &ff_mat, Mat &matIS){
   // MatCreateSeqAIJ(PETSC_COMM_SELF, irows.size(), irows.size(), 0, nullptr, &matISlocal);
   // MatCreateSeqAIJ(PETSC_COMM_SELF, A.pHM()->n, A.pHM()->m, 0, nullptr, &matISlocal);
 
+  ISLocalToGlobalMappingDestroy(&mapping_row);
+  ISLocalToGlobalMappingDestroy(&mapping_col);
+
   // This 4 lines are equivalent to MatCreateSeqAIJ
   MatCreate(PETSC_COMM_SELF, &matISlocal);
   MatSetType(matISlocal,MATSEQAIJ);
@@ -5889,6 +5892,15 @@ void ff_createMatIS( MatriceMorse<PetscScalar> &ff_mat, Mat &matIS){
   MatAssemblyEnd(matIS, MAT_FINAL_ASSEMBLY);
 
   MatConvert(matIS, MATAIJ, MAT_INPLACE_MATRIX, &matIS);
+
+  // delete [] IA;
+  // delete [] JA;
+  // delete [] aa;
+
+  delete IA;
+  delete JA;
+  delete aa;
+  MatDestroy(&matISlocal);
 }
 
 template<class HpddmType>
@@ -5971,6 +5983,8 @@ AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) co
   int maxJVh=NpVh;
 
   Mat* a = new Mat[NpUh * maxJVh]();
+  std::vector<std::pair<int, int>> destroy;
+  destroy.reserve(NpUh * maxJVh);
 
   int offsetMatrixUh = 0;
   // loop over the block
@@ -6001,7 +6015,6 @@ AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) co
       if(verbosity>2) cout << "size_block =" << b_largs.size() << endl; 
       if( b_largs.size()> 0){
         
-
         // compute largs due BEM and FEM part
         list<C_F0> largs_FEM;
         list<C_F0> largs_BEM;
@@ -6126,8 +6139,10 @@ AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) co
               
               // Transform Real Matrix in Complex Matrix 
               MatriceMorse<R> * mA = new MatriceMorse<R>(mr->n,mr->m,0,0);
+              // we divide by mpisize because the interpolation matrix is computed in sequential
+              *mr *= 1.0/mpisize;
               *mA = *mr;
-
+              
               // transform intrerpolation matrix to matrix IS
               Mat matIS_MI;
               ff_createMatIS( *mA, matIS_MI);
@@ -6150,6 +6165,12 @@ AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) co
               MatCreateComposite(PetscObjectComm((PetscObject)Abemblock->_petsc), 2, mats, &C);
               MatCompositeSetType(C, MAT_COMPOSITE_MULTIPLICATIVE);
               Abem = C;
+
+              // Abemblock->dtor();  // ???
+              MatDestroy(&mAAT);  // ???
+              // we need to that because R=Complex with BEM
+              MI_BBB->destroy();
+              delete MI_BBB;
             }
             else{
               cerr << "==== to do ==== " << endl;
@@ -6161,12 +6182,8 @@ AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) co
 #endif
         }
         if( largs_FEM.size() >0){
-          //int mpirankandsize[2];
-          //mpirankandsize[0] = mpirank;
-          //mpirankandsize[1] = mpisize;
-
           const list<C_F0> & b_largs_zz = largs_FEM;
-          
+
           varfToCompositeBlockLinearSystemALLCASE_pfes<R>( i, j, (*pUh)->typeFE[i], (*pVh)->typeFE[j], 
                                                         0, 0, (*pUh)->vect[i], (*pVh)->vect[j],
                                                         true, false, ds.sym, ds.tgv, 
@@ -6182,7 +6199,10 @@ AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) co
       Afem.pHM()->half = ds.sym;
   
       Mat matIS;
-      ff_createMatIS( *(Afem.pHM()), matIS);
+      if(nsparseblocks){
+        ff_createMatIS( *(Afem.pHM()), matIS);
+        Afem.destroy();
+      }
     
       if (Abem != PETSC_NULL) {
         if (!nsparseblocks) {
@@ -6199,6 +6219,7 @@ AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) co
       else {
         a[j * maxJVh + i] = matIS; 
       }
+      destroy.emplace_back(j, i);
     }
       
     } // end loop j
@@ -6211,9 +6232,13 @@ AnyType OpMatrixtoBilinearFormVGPETSc<HpddmType>::Op::operator()(Stack stack) co
   if( NpUh==1 && maxJVh==1 ){
     Ares->_petsc = a[0];
     Ares->_vector_global = (PetscBool) 1;
+    a = PETSC_NULL; // ???
   }else{
     MatCreateNest(PETSC_COMM_WORLD, NpUh, NULL, maxJVh, NULL, a, &Ares->_petsc);
     Ares->_vector_global = (PetscBool) 1;
+    for(std::pair<int, int> p : destroy)
+        MatDestroy(a + p.first * maxJVh + p.second);
+    delete[] a;
   }
   return SetAny<PETSc::DistributedCSR< HpddmType >*>(Ares);
 }
